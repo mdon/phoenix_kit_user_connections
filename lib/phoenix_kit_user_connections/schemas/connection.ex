@@ -65,6 +65,9 @@ defmodule PhoenixKitUserConnections.Connection do
     |> put_requested_at()
     |> foreign_key_constraint(:requester_uuid)
     |> foreign_key_constraint(:recipient_uuid)
+    |> unique_constraint([:requester_uuid, :recipient_uuid],
+      name: :phoenix_kit_user_connections_requester_recipient_uidx
+    )
   end
 
   def status_changeset(connection, attrs) do

@@ -343,6 +343,37 @@ defmodule PhoenixKitUserConnections do
     end
   end
 
+  @doc "Cancels a pending outgoing connection request."
+  def cancel_request(requester, connection_uuid) when is_binary(connection_uuid) do
+    requester_uuid = get_user_uuid(requester)
+
+    case repo().get(Connection, connection_uuid) do
+      %Connection{requester_uuid: ^requester_uuid, status: "pending"} = connection ->
+        repo().transaction(fn ->
+          log_connection_history(
+            connection.requester_uuid,
+            connection.recipient_uuid,
+            requester_uuid,
+            "removed"
+          )
+
+          case repo().delete(connection) do
+            {:ok, deleted} -> deleted
+            {:error, changeset} -> repo().rollback(changeset)
+          end
+        end)
+
+      %Connection{status: "pending"} ->
+        {:error, :not_requester}
+
+      %Connection{} ->
+        {:error, :not_pending}
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
   @doc "Removes an existing connection between two users."
   def remove_connection(user_a, user_b) do
     user_a_uuid = get_user_uuid(user_a)
@@ -550,6 +581,15 @@ defmodule PhoenixKitUserConnections do
     repo().all(query)
   end
 
+  @doc "Returns the count of users blocked by a user."
+  def blocked_count(user) do
+    user_uuid = get_user_uuid(user)
+
+    Block
+    |> where([b], b.blocker_uuid == ^user_uuid)
+    |> repo().aggregate(:count)
+  end
+
   @doc "Checks if two users can interact (neither has blocked the other)."
   def can_interact?(user_a, user_b) do
     user_a_uuid = get_user_uuid(user_a)
@@ -565,13 +605,41 @@ defmodule PhoenixKitUserConnections do
     user_a_uuid = get_user_uuid(user_a)
     user_b_uuid = get_user_uuid(user_b)
 
+    # Batch follows check (1 query instead of 2)
+    follows = get_follows_between(user_a_uuid, user_b_uuid)
+    following = Enum.any?(follows, &(&1.follower_uuid == user_a_uuid))
+    followed_by = Enum.any?(follows, &(&1.follower_uuid == user_b_uuid))
+
+    # Batch connection check (1 query instead of 3)
+    connection = get_any_connection_between(user_a_uuid, user_b_uuid)
+
+    {connected, connection_pending} =
+      case connection do
+        %Connection{status: "accepted"} ->
+          {true, nil}
+
+        %Connection{status: "pending", requester_uuid: ^user_a_uuid} ->
+          {false, :sent}
+
+        %Connection{status: "pending"} ->
+          {false, :received}
+
+        _ ->
+          {false, nil}
+      end
+
+    # Batch blocks check (1 query instead of 2)
+    blocks = get_blocks_between(user_a_uuid, user_b_uuid)
+    blocked = Enum.any?(blocks, &(&1.blocker_uuid == user_a_uuid))
+    blocked_by = Enum.any?(blocks, &(&1.blocker_uuid == user_b_uuid))
+
     %{
-      following: following?(user_a_uuid, user_b_uuid),
-      followed_by: following?(user_b_uuid, user_a_uuid),
-      connected: connected?(user_a_uuid, user_b_uuid),
-      connection_pending: get_connection_pending_status(user_a_uuid, user_b_uuid),
-      blocked: blocked?(user_a_uuid, user_b_uuid),
-      blocked_by: blocked?(user_b_uuid, user_a_uuid)
+      following: following,
+      followed_by: followed_by,
+      connected: connected,
+      connection_pending: connection_pending,
+      blocked: blocked,
+      blocked_by: blocked_by
     }
   end
 
@@ -614,24 +682,36 @@ defmodule PhoenixKitUserConnections do
     |> repo().one()
   end
 
-  defp get_connection_pending_status(user_a_uuid, user_b_uuid) do
-    sent =
-      Connection
-      |> where([c], c.requester_uuid == ^user_a_uuid and c.recipient_uuid == ^user_b_uuid)
-      |> where([c], c.status == "pending")
-      |> repo().exists?()
+  defp get_follows_between(user_a_uuid, user_b_uuid) do
+    Follow
+    |> where(
+      [f],
+      (f.follower_uuid == ^user_a_uuid and f.followed_uuid == ^user_b_uuid) or
+        (f.follower_uuid == ^user_b_uuid and f.followed_uuid == ^user_a_uuid)
+    )
+    |> repo().all()
+  end
 
-    if sent do
-      :sent
-    else
-      received =
-        Connection
-        |> where([c], c.requester_uuid == ^user_b_uuid and c.recipient_uuid == ^user_a_uuid)
-        |> where([c], c.status == "pending")
-        |> repo().exists?()
+  defp get_any_connection_between(user_a_uuid, user_b_uuid) do
+    Connection
+    |> where(
+      [c],
+      (c.requester_uuid == ^user_a_uuid and c.recipient_uuid == ^user_b_uuid) or
+        (c.requester_uuid == ^user_b_uuid and c.recipient_uuid == ^user_a_uuid)
+    )
+    |> order_by([c], fragment("CASE WHEN status = 'accepted' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END"))
+    |> limit(1)
+    |> repo().one()
+  end
 
-      if received, do: :received, else: nil
-    end
+  defp get_blocks_between(user_a_uuid, user_b_uuid) do
+    Block
+    |> where(
+      [b],
+      (b.blocker_uuid == ^user_a_uuid and b.blocked_uuid == ^user_b_uuid) or
+        (b.blocker_uuid == ^user_b_uuid and b.blocked_uuid == ^user_a_uuid)
+    )
+    |> repo().all()
   end
 
   defp accept_connection_with_actor(%Connection{status: "pending"} = connection, actor_uuid) do
@@ -684,25 +764,29 @@ defmodule PhoenixKitUserConnections do
   defp get_total_follows_count do
     Follow |> repo().aggregate(:count)
   rescue
-    _ -> 0
+    Ecto.QueryError -> 0
+    DBConnection.ConnectionError -> 0
   end
 
   defp get_total_connections_count do
     Connection |> where([c], c.status == "accepted") |> repo().aggregate(:count)
   rescue
-    _ -> 0
+    Ecto.QueryError -> 0
+    DBConnection.ConnectionError -> 0
   end
 
   defp get_total_pending_count do
     Connection |> where([c], c.status == "pending") |> repo().aggregate(:count)
   rescue
-    _ -> 0
+    Ecto.QueryError -> 0
+    DBConnection.ConnectionError -> 0
   end
 
   defp get_total_blocks_count do
     Block |> repo().aggregate(:count)
   rescue
-    _ -> 0
+    Ecto.QueryError -> 0
+    DBConnection.ConnectionError -> 0
   end
 
   # ===== HISTORY LOGGING =====
