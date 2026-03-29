@@ -349,19 +349,7 @@ defmodule PhoenixKitUserConnections do
 
     case repo().get(Connection, connection_uuid) do
       %Connection{requester_uuid: ^requester_uuid, status: "pending"} = connection ->
-        repo().transaction(fn ->
-          log_connection_history(
-            connection.requester_uuid,
-            connection.recipient_uuid,
-            requester_uuid,
-            "removed"
-          )
-
-          case repo().delete(connection) do
-            {:ok, deleted} -> deleted
-            {:error, changeset} -> repo().rollback(changeset)
-          end
-        end)
+        do_cancel_request(connection, requester_uuid)
 
       %Connection{status: "pending"} ->
         {:error, :not_requester}
@@ -372,6 +360,22 @@ defmodule PhoenixKitUserConnections do
       nil ->
         {:error, :not_found}
     end
+  end
+
+  defp do_cancel_request(connection, actor_uuid) do
+    repo().transaction(fn ->
+      log_connection_history(
+        connection.requester_uuid,
+        connection.recipient_uuid,
+        actor_uuid,
+        "removed"
+      )
+
+      case repo().delete(connection) do
+        {:ok, deleted} -> deleted
+        {:error, changeset} -> repo().rollback(changeset)
+      end
+    end)
   end
 
   @doc "Removes an existing connection between two users."
@@ -699,7 +703,10 @@ defmodule PhoenixKitUserConnections do
       (c.requester_uuid == ^user_a_uuid and c.recipient_uuid == ^user_b_uuid) or
         (c.requester_uuid == ^user_b_uuid and c.recipient_uuid == ^user_a_uuid)
     )
-    |> order_by([c], fragment("CASE WHEN status = 'accepted' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END"))
+    |> order_by(
+      [c],
+      fragment("CASE WHEN status = 'accepted' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END")
+    )
     |> limit(1)
     |> repo().one()
   end
