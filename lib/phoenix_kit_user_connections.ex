@@ -43,6 +43,7 @@ defmodule PhoenixKitUserConnections do
   use PhoenixKit.Module
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
@@ -62,12 +63,12 @@ defmodule PhoenixKitUserConnections do
 
   @impl PhoenixKit.Module
   def enable_system do
-    Settings.update_boolean_setting("connections_enabled", true)
+    Settings.update_boolean_setting_with_module("connections_enabled", true, module_key())
   end
 
   @impl PhoenixKit.Module
   def disable_system do
-    Settings.update_boolean_setting("connections_enabled", false)
+    Settings.update_boolean_setting_with_module("connections_enabled", false, module_key())
   end
 
   @impl PhoenixKit.Module
@@ -682,52 +683,69 @@ defmodule PhoenixKitUserConnections do
 
   defp get_total_follows_count do
     Follow |> repo().aggregate(:count)
+  rescue
+    _ -> 0
   end
 
   defp get_total_connections_count do
     Connection |> where([c], c.status == "accepted") |> repo().aggregate(:count)
+  rescue
+    _ -> 0
   end
 
   defp get_total_pending_count do
     Connection |> where([c], c.status == "pending") |> repo().aggregate(:count)
+  rescue
+    _ -> 0
   end
 
   defp get_total_blocks_count do
     Block |> repo().aggregate(:count)
+  rescue
+    _ -> 0
   end
 
   # ===== HISTORY LOGGING =====
 
   defp log_follow_history(follower_uuid, followed_uuid, action) do
-    %FollowHistory{}
-    |> FollowHistory.changeset(%{
-      follower_uuid: follower_uuid,
-      followed_uuid: followed_uuid,
-      action: action
-    })
-    |> repo().insert!()
+    case %FollowHistory{}
+         |> FollowHistory.changeset(%{
+           follower_uuid: follower_uuid,
+           followed_uuid: followed_uuid,
+           action: action
+         })
+         |> repo().insert() do
+      {:ok, _} -> :ok
+      {:error, e} -> Logger.warning("Failed to log follow history: #{inspect(e)}")
+    end
   end
 
   defp log_connection_history(user_a_uuid, user_b_uuid, actor_uuid, action) do
-    %ConnectionHistory{}
-    |> ConnectionHistory.changeset(%{
-      user_a_uuid: user_a_uuid,
-      user_b_uuid: user_b_uuid,
-      actor_uuid: actor_uuid,
-      action: action
-    })
-    |> repo().insert!()
+    case %ConnectionHistory{}
+         |> ConnectionHistory.changeset(%{
+           user_a_uuid: user_a_uuid,
+           user_b_uuid: user_b_uuid,
+           actor_uuid: actor_uuid,
+           action: action
+         })
+         |> repo().insert() do
+      {:ok, _} -> :ok
+      {:error, e} -> Logger.warning("Failed to log connection history: #{inspect(e)}")
+    end
   end
 
   defp log_block_history(blocker_uuid, blocked_uuid, action, reason) do
-    %BlockHistory{}
-    |> BlockHistory.changeset(%{
-      blocker_uuid: blocker_uuid,
-      blocked_uuid: blocked_uuid,
-      action: action,
-      reason: reason
-    })
-    |> repo().insert!()
+    case %BlockHistory{}
+         |> BlockHistory.changeset(%{
+           blocker_uuid: blocker_uuid,
+           blocked_uuid: blocked_uuid,
+           action: action,
+           reason: reason
+         })
+         |> repo().insert() do
+      {:ok, _} -> :ok
+      {:error, e} -> Logger.warning("Failed to log block history: #{inspect(e)}")
+    end
   end
 
   defp remove_follows_between_with_history(user_a_uuid, user_b_uuid) do

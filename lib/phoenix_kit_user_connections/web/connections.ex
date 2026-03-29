@@ -6,29 +6,36 @@ defmodule PhoenixKitUserConnections.Web.Connections do
   use PhoenixKitWeb, :live_view
 
   alias PhoenixKit.Settings
-  alias PhoenixKit.Users.Roles
+  alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKit.Utils.Routes
 
   @impl true
   def mount(_params, _session, socket) do
-    current_user = socket.assigns[:phoenix_kit_current_user]
+    scope = socket.assigns[:phoenix_kit_current_scope]
 
-    if can_access?(current_user) do
-      project_title = Settings.get_project_title()
+    cond do
+      not PhoenixKitUserConnections.enabled?() ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Connections module is not enabled")
+         |> push_navigate(to: Routes.path("/admin"))}
 
-      socket =
-        socket
-        |> assign(:page_title, "Connections")
-        |> assign(:project_title, project_title)
-        |> assign(:current_user, current_user)
-        |> load_stats()
+      not (scope && Scope.has_module_access?(scope, "connections")) ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Access denied")
+         |> push_navigate(to: Routes.path("/admin"))}
 
-      {:ok, socket}
-    else
-      {:ok,
-       socket
-       |> put_flash(:error, "Access denied")
-       |> push_navigate(to: Routes.path("/admin"))}
+      true ->
+        project_title = Settings.get_project_title()
+
+        socket =
+          socket
+          |> assign(:page_title, "Connections")
+          |> assign(:project_title, project_title)
+          |> load_stats()
+
+        {:ok, socket}
     end
   end
 
@@ -39,6 +46,16 @@ defmodule PhoenixKitUserConnections.Web.Connections do
 
   @impl true
   def handle_event("toggle_enabled", _params, socket) do
+    case check_authorization(socket) do
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Not authorized")}
+
+      :ok ->
+        do_toggle_enabled(socket)
+    end
+  end
+
+  defp do_toggle_enabled(socket) do
     new_value = !socket.assigns.enabled
 
     result =
@@ -63,10 +80,14 @@ defmodule PhoenixKitUserConnections.Web.Connections do
     end
   end
 
-  defp can_access?(nil), do: false
+  defp check_authorization(socket) do
+    scope = socket.assigns[:phoenix_kit_current_scope]
 
-  defp can_access?(user) do
-    Roles.user_has_role_owner?(user) or Roles.user_has_role_admin?(user)
+    if scope && Scope.has_module_access?(scope, "connections") do
+      :ok
+    else
+      {:error, :unauthorized}
+    end
   end
 
   defp load_stats(socket) do
