@@ -8,7 +8,7 @@ defmodule PhoenixKitUserConnections.MixProject do
     [
       app: :phoenix_kit_user_connections,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -48,9 +48,16 @@ defmodule PhoenixKitUserConnections.MixProject do
 
   defp deps do
     [
-      {:phoenix_kit, path: "../phoenix_kit"},
-      {:phoenix_live_view, "~> 1.0"},
+      # PhoenixKit provides the Module behaviour and Settings API.
+      {:phoenix_kit, "~> 1.7"},
+
+      # LiveView is needed for the admin pages.
+      {:phoenix_live_view, "~> 1.1"},
+
+      # Optional: add ex_doc for generating documentation
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+
+      # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
