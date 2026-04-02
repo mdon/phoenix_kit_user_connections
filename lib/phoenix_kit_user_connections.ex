@@ -124,7 +124,7 @@ defmodule PhoenixKitUserConnections do
   end
 
   @impl PhoenixKit.Module
-  def css_sources, do: ["phoenix_kit_user_connections"]
+  def css_sources, do: [:phoenix_kit_user_connections]
 
   @doc "Returns statistics for the admin overview page."
   def get_stats do
