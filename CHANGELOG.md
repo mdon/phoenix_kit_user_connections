@@ -2,6 +2,11 @@
 
 All notable changes to PhoenixKitUserConnections will be documented in this file.
 
+## 0.1.1 - 2026-04-11
+
+### Fixed
+- Add routing anti-pattern warning to AGENTS.md
+
 ## v0.1.0 — 2026-03-29
 
 ### Features
