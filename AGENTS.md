@@ -78,6 +78,10 @@ All schemas use UUIDv7 primary keys and reference `PhoenixKit.Users.Auth.User`.
 - `credo` — Static analysis (dev/test only)
 - `dialyxir` — Type checking (dev/test only)
 
+### Admin routing
+
+Plugin LiveView routes are auto-discovered by PhoenixKit and compiled into `live_session :phoenix_kit_admin`. Never hand-register them in a parent app's `router.ex`; use `live_view:` on a tab or a route module. See `phoenix_kit/guides/custom-admin-pages.md` for the authoritative reference.
+
 ## Testing
 
 Tests currently cover PhoenixKit.Module behaviour callbacks (module_key, module_name, enabled?, permissions, admin_tabs, version, css_sources). Integration tests requiring a database are not yet implemented.
