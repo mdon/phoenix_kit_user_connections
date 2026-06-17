@@ -32,6 +32,7 @@ defmodule PhoenixKitUserConnections.Web.Connections do
         socket =
           socket
           |> assign(:page_title, "Connections")
+          |> assign(:page_subtitle, "Social relationships overview and management")
           |> assign(:project_title, project_title)
           |> load_stats()
 

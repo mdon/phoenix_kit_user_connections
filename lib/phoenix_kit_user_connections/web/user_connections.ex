@@ -22,6 +22,7 @@ defmodule PhoenixKitUserConnections.Web.UserConnections do
       socket =
         socket
         |> assign(:page_title, "My Connections")
+        |> assign(:page_subtitle, "Manage your followers, following, and connections")
         |> assign(:project_title, project_title)
         |> assign(:current_user, current_user)
         |> assign(:tab, @default_tab)
