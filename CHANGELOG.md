@@ -2,6 +2,11 @@
 
 All notable changes to PhoenixKitUserConnections will be documented in this file.
 
+## 0.1.2 - 2026-06-17
+
+### Changed
+- Moved each admin page's title/subtitle into the top navbar (via the `@page_subtitle` assign forwarded by core's admin layout) and removed the in-page `admin_page_header`, matching the new PhoenixKit admin header pattern used across core's pages.
+
 ## 0.1.1 - 2026-04-11
 
 ### Fixed
