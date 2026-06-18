@@ -10,6 +10,7 @@ All notable changes to PhoenixKitUserConnections will be documented in this file
 - "My Connections" tabs now use LiveView `patch` navigation instead of `navigate`, and the redundant initial tab-data query was dropped from `mount/3` (`handle_params/3` already loads it). Switching tabs no longer re-mounts the LiveView or re-runs the five per-tab count queries.
 
 ### Fixed
+- Restored the in-page heading on the user-facing "My Connections" page. Moving the title into the navbar (above) is correct for the admin "Connections" page, which renders in core's admin layout, but the authenticated user dashboard layout does not surface `@page_title`/`@page_subtitle` in its navbar — so the user page was left with no visible heading. It now renders its own header from the same assigns.
 - Corrected the `css_sources/0` test to assert the atom form the callback returns (`[:phoenix_kit_user_connections]`); it had asserted the string form and was failing under `mix test`.
 - Synced the `version/0` callback to `0.1.2` (it was stale at `0.1.0`).
 

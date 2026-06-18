@@ -1,4 +1,16 @@
 <div class="container flex flex-col mx-auto px-4 py-6">
+  <%!-- Page header — rendered in-page because the authenticated user dashboard
+       layout (unlike the admin layout) does not surface @page_title/@page_subtitle
+       in its navbar, so this is the only place the heading appears for users. --%>
+  <header class="mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold text-base-content break-words">
+      {@page_title}
+    </h1>
+    <p :if={@page_subtitle} class="text-sm text-base-content/60 mt-0.5 break-words">
+      {@page_subtitle}
+    </p>
+  </header>
+
   <%!-- Tabs Navigation --%>
   <div class="mb-6 overflow-x-auto">
     <div role="tablist" class="tabs tabs-boxed flex-nowrap w-max max-w-full mx-auto">
