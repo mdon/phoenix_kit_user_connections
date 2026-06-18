@@ -82,7 +82,7 @@ defmodule PhoenixKitUserConnections.MixProject do
   defp docs do
     [
       main: "PhoenixKitUserConnections",
-      source_ref: "v#{@version}"
+      source_ref: @version
     ]
   end
 end
