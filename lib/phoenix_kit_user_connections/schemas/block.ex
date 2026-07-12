@@ -3,6 +3,7 @@ defmodule PhoenixKitUserConnections.Block do
   Schema for user blocking relationships.
   """
   use Ecto.Schema
+  use PhoenixKit.SchemaPrefix
   import Ecto.Changeset
 
   alias PhoenixKit.Utils.Date, as: UtilsDate
