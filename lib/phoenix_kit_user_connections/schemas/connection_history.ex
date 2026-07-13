@@ -3,6 +3,7 @@ defmodule PhoenixKitUserConnections.ConnectionHistory do
   Schema for connection activity history.
   """
   use Ecto.Schema
+  use PhoenixKit.SchemaPrefix
   import Ecto.Changeset
 
   alias PhoenixKit.Utils.Date, as: UtilsDate
