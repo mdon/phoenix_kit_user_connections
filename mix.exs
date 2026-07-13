@@ -57,7 +57,7 @@ defmodule PhoenixKitUserConnections.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour and Settings API.
-      {:phoenix_kit, "~> 1.7"},
+      {:phoenix_kit, "~> 1.7.189"},
 
       # LiveView is needed for the admin pages.
       {:phoenix_live_view, "~> 1.1"},
